@@ -1,46 +1,164 @@
-# Getting Started with Create React App
+# Задание
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Используя предоставленный апи создать страницу, которая отражает список товаров.
+Для каждого товара должен отображаться его id, название, цена и бренд.
 
-## Available Scripts
+### Требования:
 
-In the project directory, you can run:
+выводить по 50 товаров на страницу с возможностью постраничного перехода (
+пагинация) в обе стороны.
+возможность фильтровать выдачу используя предоставленное апи по названию, цене и
+бренду
 
-### `npm start`
+Если API возвращает дубли по id, то следует их считать одним товаром и выводить
+только первый, даже если другие поля различаются.
+Если API возвращает ошибку, следует вывести идентификатор ошибки в консоль, если
+он есть и повторить запрос.
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## API
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+Аутентификация запросов.
 
-### `npm test`
+Аутентификация запросов происходит за счет авторизационной строки, которая
+передается в параметре заголовка X-Auth.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Значение X-Auth формируется по следующему шаблону:
+md5(пароль_таймштамп)
+Таймштамп представляет собой текущую дату UTC с точностью до дня в формате год,
+месяц, день без разделителей.
+Пароль и таймштамп разделяются символом подчеркивания.
+Пример:
+`md5("password_20230821")`
 
-### `npm run build`
+В случае, если авторизационная строка сформирована некорректно, будет возвращен
+HTTP код 401
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Методы.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Работа с api осуществляется через **POST** на указанный адрес и порт. Тело
+запроса
+представляет собой json содержащий имя метода action и опциональный набор
+параметров params.
+_Пример:_
+`{
+"action": "filter",
+"params": {"price": 17500.0}
+}`
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Если запрос не содержит ошибок, на него приходит синхронный ответ в формате
+json. Результат работы метода возвращается по ключу result.
+_Пример:_
+`{
+"result": [
+"59a9b5b4-6546-417f-9c0a-7ec1b9385af1",
+"271aa4c2-70be-4a03-9e20-1fbebb2aa79f",
+"12d19cdd-a58a-41bf-b387-3c8c3d08a40a",
+]
+}`
 
-### `npm run eject`
+Если в запросе содержаться ошибки, то будет возвращен HTTP код 400
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+- **get_ids** - метод возвращает упорядоченный список идентификаторов товаров.
+  Далее
+  по выбранным идентификаторам можно запросить подробную информацию о товаре. По
+  умолчанию возвращает идентификаторы всех имеющиеся товаров.
+  Параметры:
+- **offset** - положительное целое число. Определяет смещение относительно
+  начала
+  списка.
+- **limit** - положительное целое число. Определяет желаемое число возвращаемых
+  записей.
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+_Пример запроса:_
+`{
+"action": "get_ids",
+"params": {"offset": 10, "limit": 3}
+}`
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+_Пример ответа:_
+`{
+"result": [
+"18e4e3bd-5e60-4348-8c92-4f61c676be1f",
+"711837ec-57f6-4145-b17f-c74c2896bafe",
+"6c972a4a-5b91-4a98-9780-3a19a7f41560"
+]
+}`
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+- **get_items** - возвращает упорядоченный список товаров со всеми
+  характеристиками,
+  если переданы идентификаторы товаров. Максимум 100 записей. Если нужно
+  получить
+  более 100, необходимо выполнить запрос несколько раз. Без передачи
+  идентификаторов возвращает null
+  Параметры:
+- **ids** - упорядоченный список строк. Определяет идентификаторы товаров,
+  которые
+  будут возвращены.
+  _Пример запроса:_
+  `{
+  "action": "get_items",
+  "params": {"ids": ["1789ecf3-f81c-4f49-ada2-83804dcc74b0"]}
+  }`
 
-## Learn More
+_Пример ответа:_
+`{
+"result": [
+{
+"brand": null,
+"id": "1789ecf3-f81c-4f49-ada2-83804dcc74b0",
+"price": 16700.0,
+"product": "Золотое кольцо с бриллиантами"
+}
+]
+}`
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- **get_fields** - без параметров возвращает упорядоченный список имеющихся
+  полей
+  товаров. При передаче параметра field возвращает упорядоченный список значений
+  данного поля товаров.
+  Параметры:
+- **field** - строка. Должна содержать действительное название поля товара.
+- **offset** - положительное целое число. Определяет смещение относительно
+  начала
+  списка.
+- **limit** - положительное целое число. Определяет желаемое число возвращаемых
+  записей.
+  _Пример запроса:_
+  `{
+  "action": "get_fields",
+  "params": {"field": "brand", "offset": 3, "limit": 5}
+  }`
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+_Пример ответа:_
+`{
+"result": [
+null,
+null,
+"Piaget",
+null,
+null
+]
+}`
+
+- **filter** - используется для фильтрации. Возвращает упорядоченный список
+  идентификаторов товаров, соответствующих заданному значению.
+  Параметры:
+  В качестве параметра может использоваться любое поле возвращаемое методом
+- **get_fields** без параметров. В качестве значения должен использоваться тип
+  данных
+  соответствующий полю. Для поля product будет проверяться вхождение параметра в
+  строку. Для остальных полей проверяется строгое соответствие.
+  Пример запроса:
+  `{
+  "action": "filter",
+  "params": {"price": 17500.0}
+  }`
+
+_Пример ответа:_
+`{
+"result": [
+"59a9b5b4-6546-417f-9c0a-7ec1b9385af1",
+"271aa4c2-70be-4a03-9e20-1fbebb2aa79f",
+]
+}`
+
